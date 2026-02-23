@@ -6,7 +6,7 @@
 
 function check_stack_context {
   if [[ -z "${GRAFANA_ADMIN_PASS:-}" ]]; then
-    log_error "RabbitMQ default credentials missing from 'secrets.env'."
+    log_error "GRAFANA_ADMIN_PASS missing from 'secrets.env'."
     exit 1
   fi
 }
