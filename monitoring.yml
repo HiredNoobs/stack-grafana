@@ -19,9 +19,8 @@ services:
       - victorialogs-data:/var/lib/victoria-logs
     command:
       - "--storageDataPath=/var/lib/victoria-logs"
-      - "--syslogListenAddr=:514"
-      - "--syslogListenTCP"
-      - "--syslogListenUDP"
+      - "--syslog.listenAddr.udp=:$VICTORIALOGS_UDP_PORT"
+      - "--syslog.listenAddr.tcp=:$VICTORIALOGS_TCP_PORT"
       - "--retentionPeriod=30d"
     deploy:
       mode: replicated
@@ -41,7 +40,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD: $GRAFANA_ADMIN_PASS
+      GF_SECURITY_ADMIN_PASSWORD: $GRAFANA_ADMIN_PASS
     deploy:
       mode: replicated
       replicas: $GRAFANA_REPLICAS
