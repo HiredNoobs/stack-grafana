@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------
+# Helper functions
+# -----------------------------------------------------
+
+function check_stack_context {
+  if [[ -z "${GRAFANA_ADMIN_PASS:-}" ]]; then
+    log_error "RabbitMQ default credentials missing from 'secrets.env'."
+    exit 1
+  fi
+}
+
+# -----------------------------------------------------
+# Stack functions
+# -----------------------------------------------------
+
+function stack_check_env {
+  if [ ! -d "$SECRETS" ]; then
+    echo "Secrets directory is missing from '$ENVIRONMENT_BASE'."
+    exit 1
+  fi
+}
+
+function stack_discover {
+  export GRAFANA_REPLICAS=$(count "$GRAFANA_NODES")
+  export VICTORIALOGS_REPLICAS=$(count "$VICTORIALOGS_NODES")
+}
+
+function stack_env {
+  echo
+  echo "GRAFANA IMAGE      = $GRAFANA_IMAGE"
+  echo "GRAFANA NODES      = ($GRAFANA_REPLICAS)"
+  list "$GRAFANA_NODES"
+  echo
+  echo "VICTORIALOGS IMAGE = $VICTORIALOGS_IMAGE"
+  echo "VICTORIALOGS NODES = ($VICTORIALOGS_REPLICAS)"
+  list "$VICTORIALOGS_NODES"
+  echo
+  echo "UDP/TCP PORT       = $VICTORIALOGS_UDP_PORT/$VICTORIALOGS_TCP_PORT"
+  echo
+}
+
+function stack_deploy {
+  check_stack_context
+  docker stack deploy --detach=true -c monitoring.yml "$STACK"
+}

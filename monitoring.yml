@@ -1,0 +1,56 @@
+services:
+  victorialogs:
+    hostname: victorialogs{{.Task.Slot}}
+    image: $VICTORIALOGS_IMAGE
+    ports:
+      - mode: host
+        published: $VICTORIALOGS_UDP_PORT
+        target: $VICTORIALOGS_UDP_PORT
+        protocol: udp
+      - mode: host
+        published: $VICTORIALOGS_TCP_PORT
+        target: $VICTORIALOGS_TCP_PORT
+        protocol: tcp
+      - mode: host
+        published: $VICTORIALOGS_HTTP_PORT
+        target: $VICTORIALOGS_HTTP_PORT
+        protocol: tcp
+    volumes:
+      - victorialogs-data:/var/lib/victoria-logs
+    command:
+      - "--storageDataPath=/var/lib/victoria-logs"
+      - "--syslogListenAddr=:514"
+      - "--syslogListenTCP"
+      - "--syslogListenUDP"
+      - "--retentionPeriod=30d"
+    deploy:
+      mode: replicated
+      replicas: $VICTORIALOGS_REPLICAS
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.${STACK}_victorialogs == 1
+  grafana:
+    hostname: grafana{{.Task.Slot}}
+    image: $GRAFANA_IMAGE
+    ports:
+      - mode: host
+        published: $GRAFANA_PORT
+        target: $GRAFANA_PORT
+        protocol: tcp
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD: $GRAFANA_ADMIN_PASS
+    deploy:
+      mode: replicated
+      replicas: $GRAFANA_REPLICAS
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.${STACK}_grafana == 1
+    
+
+volumes:
+  victorialogs-data:
+  grafana-data:
