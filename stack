@@ -26,6 +26,44 @@ function build_secrets {
   fi
 }
 
+function grafana_health {
+  local resp http_code start now elapsed
+
+  log_info "Waiting for Grafana to become healthy…"
+
+  start=$(date +%s)
+  while true; do
+    resp=$(curl -s -w "\n%{http_code}" "https://grafana.$DOMAIN/api/health")
+    http_code="${resp: -3}"
+
+    if [[ "$http_code" == "200" ]]; then
+      log_info "Grafana ready."
+      break
+    fi
+
+    now=$(date +%s)
+    elapsed=$(( now - start ))
+
+    if (( elapsed > 300 )); then
+      log_error "Grafana did not become ready within 5 minutes."
+      exit 1
+    fi
+
+    sleep 5
+  done
+}
+
+function grafana_install_plugins {
+  local grafana_node container_id
+  
+  grafana_node=$(first "$GRAFANA_FQDN_NODES")
+  container_id=$(docker -H "ssh://$grafana_node" ps --filter "name=${STACK}_grafana" --filter status=running -q)
+
+  docker -H "ssh://$grafana_node" exec "$container_id" grafana cli plugins install victoriametrics-logs-datasource
+
+  log_info "Plugins installed or updated. A re-deploy may be necessary."
+}
+
 # -----------------------------------------------------
 # Stack functions
 # -----------------------------------------------------
@@ -60,4 +98,6 @@ function stack_deploy {
   check_stack_context
   build_secrets
   docker stack deploy --detach=true -c victorialogs.yml -c grafana.yml "$STACK"
+  grafana_health
+  grafana_install_plugins
 }
