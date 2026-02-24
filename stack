@@ -18,11 +18,11 @@ function build_secrets {
   fi
   
   if [[ ! -f "$SECRETS/grafana.crt" || ! -f "$SECRETS/grafana.key" ]]; then
-    make-cert grafana "$BROKER_NODES $BROKER_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
+    make-cert grafana "$GRAFANA_NODES $GRAFANA_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
   fi
 
   if [[ ! -f "$SECRETS/victorialogs.crt" || ! -f "$SECRETS/victorialogs.key" ]]; then
-    make-cert victorialogs "$BROKER_NODES $BROKER_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
+    make-cert victorialogs "$VICTORIALOGS_NODES $VICTORIALOGS_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
   fi
 }
 
