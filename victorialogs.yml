@@ -15,12 +15,20 @@ services:
         published: $VICTORIALOGS_HTTP_PORT
         target: $VICTORIALOGS_HTTP_PORT
         protocol: tcp
+    secrets:
+      - source: victorialogs_crt
+        target: /etc/victorialogs/tls/victorialogs.crt
+      - source: victorialogs_key
+        target: /etc/victorialogs/tls/victorialogs.key
     volumes:
       - victorialogs-data:/var/lib/victoria-logs
     command:
       - "--storageDataPath=/var/lib/victoria-logs"
       - "--syslog.listenAddr.udp=:$VICTORIALOGS_UDP_PORT"
       - "--syslog.listenAddr.tcp=:$VICTORIALOGS_TCP_PORT"
+      - "--tls"
+      - "--tlsCertFile=/etc/victorialogs/tls/victorialogs.crt"
+      - "--tlsKeyFile=/etc/victorialogs/tls/victorialogs.key"
       - "--retentionPeriod=30d"
     deploy:
       mode: replicated
@@ -29,27 +37,12 @@ services:
         max_replicas_per_node: 1
         constraints:
           - node.labels.${STACK}_victorialogs == 1
-  grafana:
-    hostname: grafana{{.Task.Slot}}
-    image: $GRAFANA_IMAGE
-    ports:
-      - mode: host
-        published: $GRAFANA_PORT
-        target: $GRAFANA_PORT
-        protocol: tcp
-    volumes:
-      - grafana-data:/var/lib/grafana
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: $GRAFANA_ADMIN_PASS
-    deploy:
-      mode: replicated
-      replicas: $GRAFANA_REPLICAS
-      placement:
-        max_replicas_per_node: 1
-        constraints:
-          - node.labels.${STACK}_grafana == 1
-    
+
+secrets:
+  victorialogs_crt:
+    file: ${SECRETS}/victorialogs.crt
+  victorialogs_key:
+    file: ${SECRETS}/victorialogs.key
 
 volumes:
   victorialogs-data:
-  grafana-data:

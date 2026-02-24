@@ -11,6 +11,21 @@ function check_stack_context {
   fi
 }
 
+function build_secrets {
+  if [[ ! -f "$SECRETS/ca.crt" || ! -f "$SECRETS/ca.key" ]]; then
+    make-ca monitoring -o "$SECRETS"
+    make-truststore monitoring "$SECRETS/ca.crt" -o "$SECRETS"
+  fi
+  
+  if [[ ! -f "$SECRETS/grafana.crt" || ! -f "$SECRETS/grafana.key" ]]; then
+    make-cert grafana "$BROKER_NODES $BROKER_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
+  fi
+
+  if [[ ! -f "$SECRETS/victorialogs.crt" || ! -f "$SECRETS/victorialogs.key" ]]; then
+    make-cert victorialogs "$BROKER_NODES $BROKER_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
+  fi
+}
+
 # -----------------------------------------------------
 # Stack functions
 # -----------------------------------------------------
@@ -43,5 +58,6 @@ function stack_env {
 
 function stack_deploy {
   check_stack_context
-  docker stack deploy --detach=true -c monitoring.yml "$STACK"
+  build_secrets
+  docker stack deploy --detach=true -c victorialogs.yml -c grafana.yml "$STACK"
 }
