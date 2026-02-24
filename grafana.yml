@@ -17,6 +17,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: $GRAFANA_ADMIN_PASS
 
+      GF_SERVER_PROTOCOL: https
       GF_SERVER_CERT_FILE: /etc/grafana/tls/grafana.crt
       GF_SERVER_CERT_KEY: /etc/grafana/tls/grafana.key
     deploy:
