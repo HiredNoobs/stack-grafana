@@ -1,0 +1,39 @@
+services:
+  victoriametrics:
+    hostname: victoriametrics{{.Task.Slot}}
+    image: $VICTORIAMETRICS_IMAGE
+    ports:
+      - mode: host
+        published: $VICTORIAMETRICS_HTTP_PORT
+        target: $VICTORIAMETRICS_HTTP_PORT
+        protocol: tcp
+    secrets:
+      - source: victoriametrics_crt
+        target: /etc/victoriametrics/tls/victoriametrics.crt
+      - source: victoriametrics_key
+        target: /etc/victoriametrics/tls/victoriametrics.key
+    volumes:
+      - victoriametrics-data:/victoria-metrics-data
+    command:
+      - "--storageDataPath=/victoria-metrics-data"
+      - "--httpListenAddr=:$VICTORIAMETRICS_HTTP_PORT"
+      - "--tls"
+      - "--tlsCertFile=/etc/victoriametrics/tls/victoriametrics.crt"
+      - "--tlsKeyFile=/etc/victoriametrics/tls/victoriametrics.key"
+      - "--retentionPeriod=30d"
+    deploy:
+      mode: replicated
+      replicas: $VICTORIAMETRICS_REPLICAS
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.${STACK}_victoriametrics == 1
+
+secrets:
+  victoriametrics_crt:
+    file: ${SECRETS}/victoriametrics.crt
+  victoriametrics_key:
+    file: ${SECRETS}/victoriametrics.key
+
+volumes:
+  victoriametrics-data:

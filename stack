@@ -11,19 +11,37 @@ function check_stack_context {
   fi
 }
 
+function build_configs {
+  find "$CONFIGS" -maxdepth 1 -type f -name '.*tmpl' | while IFS= read -r tmpl; do
+    local out="${tmpl%.tmpl}"
+    envsubst < "$tmpl" > "$out"
+  done
+}
+
 function build_secrets {
   if [[ ! -f "$SECRETS/ca.crt" || ! -f "$SECRETS/ca.key" ]]; then
     make-ca monitoring -o "$SECRETS"
     make-truststore monitoring "$SECRETS/ca.crt" -o "$SECRETS"
   fi
-  
-  if [[ ! -f "$SECRETS/grafana.crt" || ! -f "$SECRETS/grafana.key" ]]; then
-    make-cert grafana "$GRAFANA_NODES $GRAFANA_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
-  fi
 
-  if [[ ! -f "$SECRETS/victorialogs.crt" || ! -f "$SECRETS/victorialogs.key" ]]; then
-    make-cert victorialogs "$VICTORIALOGS_NODES $VICTORIALOGS_FQDN_NODES" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
-  fi
+  declare -A CERT_TARGETS=(
+    [grafana]="$GRAFANA_NODES $GRAFANA_FQDN_NODES"
+    [victorialogs]="$VICTORIALOGS_NODES $VICTORIALOGS_FQDN_NODES"
+    [victoriametrics]="$VICTORIAMETRICS_NODES $VICTORIAMETRICS_FQDN_NODES"
+    [vmagent]="$VMAGENT_NODES $VMAGENT_FQDN_NODES"
+  )
+
+  for service in "${!CERT_TARGETS[@]}"; do
+    local crt="$SECRETS/$service.crt"
+    local key="$SECRETS/$service.key"
+
+    if [[ ! -f "$crt" || ! -f "$key" ]]; then
+      make-cert "$service" "${CERT_TARGETS[$service]}" \
+        -o "$SECRETS" \
+        --ca-crt "$SECRETS/ca.crt" \
+        --ca-key "$SECRETS/ca.key"
+    fi
+  done
 }
 
 function grafana_health {
@@ -60,6 +78,7 @@ function grafana_install_plugins {
   container_id=$(docker -H "ssh://$grafana_node" ps --filter "name=${STACK}_grafana" --filter status=running -q)
 
   docker -H "ssh://$grafana_node" exec "$container_id" grafana cli plugins install victoriametrics-logs-datasource
+  docker -H "ssh://$grafana_node" exec "$container_id" grafana cli plugins install victoriametrics-metrics-datasource
 
   log_info "Plugins installed or updated. A re-deploy may be necessary."
 }
@@ -78,6 +97,8 @@ function stack_check_env {
 function stack_discover {
   export GRAFANA_REPLICAS=$(count "$GRAFANA_NODES")
   export VICTORIALOGS_REPLICAS=$(count "$VICTORIALOGS_NODES")
+  export VICTORIAMETRICS_REPLICAS=$(count "$VICTORIAMETRICS_NODES")
+  export VMAGENT_REPLICAS=$(count "$VMAGENT_NODES")
 }
 
 function stack_env {
@@ -96,8 +117,14 @@ function stack_env {
 
 function stack_deploy {
   check_stack_context
+  build_configs
   build_secrets
-  docker stack deploy --detach=true -c victorialogs.yml -c grafana.yml "$STACK"
+  docker stack deploy --detach=true \
+    -c victorialogs.yml \
+    -c victoriametrics.yml \
+    -c vmagent.yml \
+    -c grafana.yml\
+    "$STACK"
   grafana_health
   grafana_install_plugins
 }

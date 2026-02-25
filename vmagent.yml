@@ -1,0 +1,47 @@
+services:
+  vmagent:
+    hostname: vmagent{{.Task.Slot}}
+    image: $VMAGENT_IMAGE
+    ports:
+      - mode: host
+        published: $VMAGENT_HTTP_PORT
+        target: $VMAGENT_HTTP_PORT
+        protocol: tcp
+    configs:
+      - source: vmagent_yml
+        target: /etc/vmagent/config.yml
+    secrets:
+      - source: vmagent_crt
+        target: /etc/vmagent/tls/vmagent.crt
+      - source: vmagent_key
+        target: /etc/vmagent/tls/vmagent.key
+    volumes:
+      - vmagent-data:/vmagentdata
+    command:
+      - "--httpListenAddr=:$VMAGENT_HTTP_PORT"
+      - "--tls"
+      - "--tlsCertFile=/etc/vmagent/tls/vmagent.crt"
+      - "--tlsKeyFile=/etc/vmagent/tls/vmagent.key"
+      - "--remoteWrite.url=https://victoriametrics.$DOMAIN/api/v1/write"
+      - "--remoteWrite.tmpDataPath=/vmagentdata"
+      - "--promscrape.config=/etc/vmagent/config.yml"
+    deploy:
+      mode: replicated
+      replicas: $VMAGENT_REPLICAS
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.${STACK}_vmagent == 1
+
+configs:
+  vmagent_yml:
+    file: ${CONFIGS}/vmagent.yml
+
+secrets:
+  vmagent_crt:
+    file: ${SECRETS}/vmagent.crt
+  vmagent_key:
+    file: ${SECRETS}/vmagent.key
+
+volumes:
+  vmagent-data:

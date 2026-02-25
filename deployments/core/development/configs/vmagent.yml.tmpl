@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  # -----------------------------------------------------
+  # Vault Metrics
+  # -----------------------------------------------------
+  - job_name: "vault"
+    metrics_path: /v1/sys/metrics
+    params:
+      format: ["prometheus"]
+    static_configs:
+      - targets:
+          - "dev-vault001.${DOMAIN}:8200"
+    scheme: https
+    tls_config:
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
