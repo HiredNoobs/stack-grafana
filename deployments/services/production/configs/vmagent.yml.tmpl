@@ -3,6 +3,25 @@ global:
   scrape_timeout: 10s
 
 scrape_configs:
+  - job_name: node
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+        - "prod-rsyslog001.${DOMAIN}:9100"
+        - "prod-rsyslog002.${DOMAIN}:9100"
+        - "prod-redis001.${DOMAIN}:9100"
+        - "prod-rabbitmq001.${DOMAIN}:9100"
+        - "prod-contentbot001.${DOMAIN}:9100"
+        - "prod-vault001.${DOMAIN}:9100"
+        - "prod-vault002.${DOMAIN}:9100"
+        - "prod-grafana001.${DOMAIN}:9100"
+        - "atlas.${DOMAIN}:9100"
+    scheme: http
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "([^:]+):.*"
+        target_label: instance
+        replacement: "$1"
   - job_name: "vault"
     metrics_path: /v1/sys/metrics
     params:

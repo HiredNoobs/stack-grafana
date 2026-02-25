@@ -47,7 +47,7 @@ function build_secrets {
 function grafana_health {
   local resp http_code start now elapsed
 
-  log_info "Waiting for Grafana to become healthy…"
+  log_info "Waiting for Grafana to become healthy..."
 
   start=$(date +%s)
   while true; do
