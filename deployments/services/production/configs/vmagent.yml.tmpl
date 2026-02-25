@@ -16,6 +16,7 @@ scrape_configs:
           - "prod-vault002.${DOMAIN}:8200"
     scheme: https
     tls_config:
+      insecure_skip_verify: true
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance

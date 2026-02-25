@@ -71,7 +71,20 @@ function grafana_health {
   done
 }
 
-function grafana_install_plugins {
+# -----------------------------------------------------
+# Commands
+# -----------------------------------------------------
+
+function command_grafana_install_plugins {
+  discover_stack_context
+  run_grafana_install_plugins
+}
+
+# -----------------------------------------------------
+# Grafana functions
+# -----------------------------------------------------
+
+function run_grafana_install_plugins {
   local grafana_node container_id
   
   grafana_node=$(first "$GRAFANA_FQDN_NODES")
@@ -144,5 +157,5 @@ function stack_deploy {
     -c grafana.yml\
     "$STACK"
   grafana_health
-  grafana_install_plugins
+  run_grafana_install_plugins
 }
