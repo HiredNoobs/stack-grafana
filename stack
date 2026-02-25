@@ -95,6 +95,8 @@ function stack_check_env {
 }
 
 function stack_discover {
+  export GRAFANA_NODE=$(first "$GRAFANA_FQDN_NODES")
+
   export GRAFANA_REPLICAS=$(count "$GRAFANA_NODES")
   export VICTORIALOGS_REPLICAS=$(count "$VICTORIALOGS_NODES")
   export VICTORIAMETRICS_REPLICAS=$(count "$VICTORIAMETRICS_NODES")
@@ -103,17 +105,37 @@ function stack_discover {
 
 function stack_env {
   echo
-  echo "GRAFANA IMAGE      = $GRAFANA_IMAGE"
-  echo "GRAFANA NODES      = ($GRAFANA_REPLICAS)"
+  echo "GRAFANA IMAGE          = $GRAFANA_IMAGE"
+  echo "GRAFANA NODES          = ($GRAFANA_REPLICAS)"
   list "$GRAFANA_NODES"
   echo
-  echo "VICTORIALOGS IMAGE = $VICTORIALOGS_IMAGE"
-  echo "VICTORIALOGS NODES = ($VICTORIALOGS_REPLICAS)"
+  echo "GRAFANA UI             = $GRAFANA_NODE:$GRAFANA_PORT"
+  echo
+
+  echo "V LOGS IMAGE           = $VICTORIALOGS_IMAGE"
+  echo "V LOGS NODES           = ($VICTORIALOGS_REPLICAS)"
   list "$VICTORIALOGS_NODES"
   echo
-  echo "UDP/TCP PORT       = $VICTORIALOGS_UDP_PORT/$VICTORIALOGS_TCP_PORT"
+  echo "V LOGS UDP PORT        = $VICTORIALOGS_UDP_PORT"
+  echo "V LOGS TCP PORT        = $VICTORIALOGS_TCP_PORT"
+  echo "V LOGS HTTP PORT       = $VICTORIALOGS_HTTP_PORT"
+  echo
+
+  echo "V METRICS IMAGE        = $VICTORIAMETRICS_IMAGE"
+  echo "V METRICS NODES        = ($VICTORIAMETRICS_REPLICAS)"
+  list "$VICTORIAMETRICS_NODES"
+  echo
+  echo "V METRICS HTTP PORT    = $VICTORIAMETRICS_HTTP_PORT"
+  echo
+
+  echo "VMAGENT IMAGE          = $VMAGENT_IMAGE"
+  echo "VMAGENT NODES          = ($VMAGENT_REPLICAS)"
+  list "$VMAGENT_NODES"
+  echo
+  echo "VMAGENT HTTP PORT      = $VMAGENT_HTTP_PORT"
   echo
 }
+
 
 function stack_deploy {
   check_stack_context
