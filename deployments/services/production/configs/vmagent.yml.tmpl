@@ -15,6 +15,7 @@ scrape_configs:
         - "prod-vault001.${DOMAIN}:9100"
         - "prod-vault002.${DOMAIN}:9100"
         - "prod-grafana001.${DOMAIN}:9100"
+        - "prod-landing001.${DOMAIN}:9100"
         - "atlas.${DOMAIN}:9100"
     scheme: http
     relabel_configs:
