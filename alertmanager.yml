@@ -20,6 +20,13 @@ services:
     command:
       - "--config.file=/etc/alertmanager/config/alertmanager.yml"
       - "--web.config.file=/etc/alertmanager/config/alertmanager_web.yml"
+    deploy:
+      mode: replicated
+      replicas: $ALERTMANAGER_REPLICAS
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.${STACK}_alertmanager == 1
 
 configs:
   alertmanager_yml:

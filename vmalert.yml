@@ -27,6 +27,13 @@ services:
       - "--rule=/etc/alerts/*.yml"
       - "--external.url=https://grafana.$DOMAIN/"
       - '--external.alert.source=explore?orgId=1&left={"datasource":"VictoriaMetrics","queries":[{"expr":{{.Expr|jsonEscape|queryEscape}},"refId":"A"}],"range":{"from":"{{ .ActiveAt.UnixMilli }}","to":"now"}}'
+    deploy:
+      mode: replicated
+      replicas: $VMALERT_REPLICAS
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.${STACK}_vmalert == 1
 
 configs:
   alerts_yml:

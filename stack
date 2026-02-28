@@ -110,18 +110,17 @@ function stack_check_env {
 }
 
 function stack_discover {
-  export GRAFANA_NODE=$(first "$GRAFANA_FQDN_NODES")
-
   export GRAFANA_REPLICAS=$(count "$GRAFANA_NODES")
   export VICTORIALOGS_REPLICAS=$(count "$VICTORIALOGS_NODES")
   export VICTORIAMETRICS_REPLICAS=$(count "$VICTORIAMETRICS_NODES")
   export VMAGENT_REPLICAS=$(count "$VMAGENT_NODES")
+  export VMALERT_REPLICAS=$(count "$VMALERT_NODES")
+  export ALERTMANAGER_REPLICAS=$(count "$ALERTMANAGER_NODES")
 }
 
 function stack_env {
   echo
   echo "GRAFANA IMAGE                = $GRAFANA_IMAGE"
-  echo "GRAFANA UI                   = $GRAFANA_NODE:$GRAFANA_PORT"
   echo "GRAFANA NODES                = ($GRAFANA_REPLICAS)"
   list "$GRAFANA_NODES"
   echo
@@ -144,6 +143,16 @@ function stack_env {
   echo "VMAGENT HTTP PORT            = $VMAGENT_HTTP_PORT"
   echo "VMAGENT NODES                = ($VMAGENT_REPLICAS)"
   list "$VMAGENT_NODES"
+  echo
+  echo "VMALERT IMAGE                = $VMALERT_IMAGE"
+  echo "VMALERT HTTP PORT            = $VMALERT_HTTP_PORT"
+  echo "VMALERT NODES                = ($VMALERT_REPLICAS)"
+  list "$VMALERT_NODES"
+  echo
+  echo "ALERTMANAGER IMAGE           = $ALERTMANAGER_IMAGE"
+  echo "ALERTMANAGER HTTP PORT       = $ALERTMANAGER_HTTP_PORT"
+  echo "ALERTMANAGER NODES           = $ALERTMANAGER_REPLICAS"
+  list "$ALERTMANAGER_NODES"
   echo
 }
 
