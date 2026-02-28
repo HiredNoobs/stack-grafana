@@ -20,6 +20,15 @@ groups:
         annotations:
           summary: Host memory under memory pressure (instance {{ $labels.instance }})
           description: "The node is under heavy memory pressure. High rate of loading memory pages from disk.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      # When a machine runs out of memory, the node exporter can become unresponsive for several minutes. Even if the system takes 15–20 minutes to recover, the alert should still trigger.
+      - alert: HostOomKillDetected
+        expr: (increase(node_vmstat_oom_kill[30m]) > 0)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host OOM kill detected (instance {{ $labels.instance }})
+          description: "OOM kill detected\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
       - alert: HostHighCpuLoad
         expr: 1 - (avg without (cpu) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > .80
         for: 10m
@@ -28,3 +37,19 @@ groups:
         annotations:
           summary: Host high CPU load (instance {{ $labels.instance }})
           description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: HostSystemdServiceCrashed
+        expr: (node_systemd_unit_state{state="failed"} == 1)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host systemd service crashed (instance {{ $labels.instance }})
+          description: "systemd service crashed\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: HostDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host down: {{ $labels.instance }}"
+          description: "Node exporter on {{ $labels.instance }} has been unreachable for 2 minutes."
