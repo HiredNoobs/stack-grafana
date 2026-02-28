@@ -22,7 +22,7 @@ services:
       - "--tlsKeyFile=/etc/vmalert/tls/vmalert.key"
       - "--datasource.url=https://victoriametrics.$DOMAIN/"
       - "--remoteRead.url=https://victoriametrics.$DOMAIN/"
-      - "--remoteWrite.url=https://vmalert.$DOMAIN/"
+      - "--remoteWrite.url=https://vmagent.$DOMAIN/"
       - "--notifier.url=https://alertmanager.$DOMAIN/"
       - "--rule=/etc/alerts/*.yml"
       - "--external.url=https://grafana.$DOMAIN/"
