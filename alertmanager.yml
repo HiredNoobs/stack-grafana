@@ -1,0 +1,34 @@
+services:
+  alertmanager:
+    hostname: alertmanager{{.Task.Slot}}
+    image: $ALERTMANAGER_IMAGE
+    ports:
+      - mode: host
+        published: $ALERTMANAGER_HTTP_PORT
+        target: $ALERTMANAGER_HTTP_PORT
+        protocol: tcp
+    configs:
+      - source: alertmanager_yml
+        target: /etc/alertmanager/config/alertmanager.yml
+      - source: alertmanager_web_yml
+        target: /etc/alertmanager/config/alertmanager_web.yml
+    secrets:
+      - source: alertmanager_crt
+        target: /etc/alertmanager/tls/alertmanager.crt
+      - source: alertmanager_key
+        target: /etc/alertmanager/tls/alertmanager.key
+    command:
+      - "--config.file=/etc/alertmanager/config/alertmanager.yml"
+      - "--web.config.file=/etc/alertmanager/config/alertmanager_web.yml"
+
+configs:
+  alertmanager_yml:
+    file: ${CONFIGS}/alertmanager.yml
+  alertmanager_web_yml:
+    file: ${CONFIGS}/alertmanager_web.yml
+
+secrets:
+  alertmanager_crt:
+    file: ${SECRETS}/alertmanager.crt
+  alertmanager_key:
+    file: ${SECRETS}/alertmanager.key

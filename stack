@@ -29,6 +29,8 @@ function build_secrets {
     [victorialogs]="$VICTORIALOGS_NODES $VICTORIALOGS_FQDN_NODES"
     [victoriametrics]="$VICTORIAMETRICS_NODES $VICTORIAMETRICS_FQDN_NODES"
     [vmagent]="$VMAGENT_NODES $VMAGENT_FQDN_NODES"
+    [vmalert]="$VMALERT_NODES $VMALERT_FQDN_NODES"
+    [alertmanager]="$ALERTMANAGER_NODES $ALERTMANAGERT_FQDN_NODES"
   )
 
   for service in "${!CERT_TARGETS[@]}"; do

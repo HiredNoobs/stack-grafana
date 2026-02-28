@@ -1,0 +1,39 @@
+services:
+  vmalert:
+    hostname: vmalert{{.Task.Slot}}
+    image: $VMALERT_IMAGE
+    ports:
+      - mode: host
+        published: $VMALERT_HTTP_PORT
+        target: $VMALERT_HTTP_PORT
+        protocol: tcp
+    configs:
+      - source: alerts_yml
+        target: /etc/alerts/alert.yml
+    secrets:
+      - source: vmalert_crt
+        target: /etc/vmalert/tls/vmalert.crt
+      - source: vmalert_key
+        target: /etc/vmalert/tls/vmalert.key
+    command:
+      - "--httpListenAddr=:$VMALERT_HTTP_PORT"
+      - "--tls"
+      - "--tlsCertFile=/etc/vmalert/tls/vmalert.crt"
+      - "--tlsKeyFile=/etc/vmalert/tls/vmalert.key"
+      - "--datasource.url=https://victoriametrics.$DOMAIN/"
+      - "--remoteRead.url=https://victoriametrics.$DOMAIN/"
+      - "--remoteWrite.url=https://vmalert.$DOMAIN/"
+      - "--notifier.url=https://alertmanager.$DOMAIN/"
+      - "--rule=/etc/alerts/*.yml"
+      - "--external.url=https://grafana.$DOMAIN/"
+      - '--external.alert.source=explore?orgId=1&left={"datasource":"VictoriaMetrics","queries":[{"expr":{{.Expr|jsonEscape|queryEscape}},"refId":"A"}],"range":{"from":"{{ .ActiveAt.UnixMilli }}","to":"now"}}'
+
+configs:
+  alerts_yml:
+    file: ${CONFIGS}/alerts.yml
+
+secrets:
+  vmalert_crt:
+    file: ${SECRETS}/vmalert.crt
+  vmalert_key:
+    file: ${SECRETS}/vmalert.key
