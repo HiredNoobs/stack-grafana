@@ -165,7 +165,9 @@ function stack_deploy {
     -c victorialogs.yml \
     -c victoriametrics.yml \
     -c vmagent.yml \
-    -c grafana.yml\
+    -c vmalert.yml \
+    -c alertmanager.yml \
+    -c grafana.yml \
     "$STACK"
   grafana_health
   run_grafana_install_plugins
