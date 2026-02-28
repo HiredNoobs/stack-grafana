@@ -1,7 +1,7 @@
 # See: https://samber.github.io/awesome-prometheus-alerts/rules.html#host-and-hardware
 groups:
   - name: Node
-    interval: 300s
+    interval: 60s
     concurrency: 1
     rules:
       - alert: HostOutOfMemory
