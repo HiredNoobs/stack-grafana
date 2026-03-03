@@ -7,6 +7,10 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
+        - "prod-nginx001.${DOMAIN}:9100"
+        - "prod-nginx002.${DOMAIN}:9100"
+        - "prod-pihole001.${DOMAIN}:9100"
+        - "prod-pihole002.${DOMAIN}:9100"
         - "prod-rsyslog001.${DOMAIN}:9100"
         - "prod-rsyslog002.${DOMAIN}:9100"
         - "prod-redis001.${DOMAIN}:9100"
