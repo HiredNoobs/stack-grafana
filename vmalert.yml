@@ -37,7 +37,7 @@ services:
 
 configs:
   alerts_yml:
-    file: ${CONFIGS}/alerts.yml
+    file: ${CONFIGS}/vmalert/alerts.yml
 
 secrets:
   vmalert_crt:

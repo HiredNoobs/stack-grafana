@@ -30,9 +30,9 @@ services:
 
 configs:
   alertmanager_yml:
-    file: ${CONFIGS}/alertmanager.yml
+    file: ${CONFIGS}/alertmanager/alertmanager.yml
   alertmanager_web_yml:
-    file: ${CONFIGS}/alertmanager_web.yml
+    file: ${CONFIGS}/alertmanager/alertmanager_web.yml
 
 secrets:
   alertmanager_crt:

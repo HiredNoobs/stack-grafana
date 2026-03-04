@@ -32,7 +32,7 @@ services:
 
 configs:
   datasources_yml:
-    file: ${CONFIGS}/datasources.yml
+    file: ${CONFIGS}/grafana/datasources.yml
 
 secrets:
   grafana_crt:

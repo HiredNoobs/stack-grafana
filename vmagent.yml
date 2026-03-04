@@ -35,7 +35,7 @@ services:
 
 configs:
   vmagent_yml:
-    file: ${CONFIGS}/vmagent.yml
+    file: ${CONFIGS}/vmagent/vmagent.yml
 
 secrets:
   vmagent_crt:
