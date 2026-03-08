@@ -45,7 +45,7 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - "rabbitmq-metrics.${DOMAIN}"
+          - "rabbitmqmetrics.${DOMAIN}"
     scheme: https
     relabel_configs:
       - source_labels: [__address__]
