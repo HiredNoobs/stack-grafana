@@ -11,21 +11,31 @@ services:
       - source: alerts_yml
         target: /etc/alerts/alert.yml
     secrets:
+      - source: ca_crt
+        target: /etc/vmalert/tls/ca.crt
       - source: vmalert_crt
         target: /etc/vmalert/tls/vmalert.crt
       - source: vmalert_key
         target: /etc/vmalert/tls/vmalert.key
     command:
       - "--httpListenAddr=:$VMALERT_HTTP_PORT"
+
       - "--tls"
       - "--tlsCertFile=/etc/vmalert/tls/vmalert.crt"
       - "--tlsKeyFile=/etc/vmalert/tls/vmalert.key"
-      - "--datasource.url=https://victoriametrics.$DOMAIN/"
-      - "--remoteRead.url=https://victoriametrics.$DOMAIN/"
-      - "--remoteWrite.url=https://vmagent.$DOMAIN/"
-      - "--notifier.url=https://alertmanager.$DOMAIN/"
+
+      - "--datasource.url=https://prod-victoriametrics001.$DOMAIN:$VICTORIAMETRICS_HTTP_PORT"
+      - "--remoteRead.url=https://prod-victoriametrics001.$DOMAIN:$VICTORIAMETRICS_HTTP_PORT"
+      - "--remoteRead.tlsCAFile=/etc/vmalert/tls/ca.crt"
+
+      - "--remoteWrite.url=https://prod-vmagent001.$DOMAIN:$VMAGENT_HTTP_PORT"
+      - "--remoteWrite.tlsCAFile=/etc/vmalert/tls/ca.crt"
+
+      - "--notifier.url=https://prod-alertmanager001.$DOMAIN:$ALERTMANAGER_HTTP_PORT"
+      - "--notifier.tlsCAFile=/etc/vmalert/tls/ca.crt"
+
       - "--rule=/etc/alerts/*.yml"
-      - "--external.url=https://grafana.$DOMAIN/"
+      - "--external.url=https://grafana.$DOMAIN:$GRAFANA_PORT"
       - '--external.alert.source=explore?orgId=1&left={"datasource":"VictoriaMetrics","queries":[{"expr":{{.Expr|jsonEscape|queryEscape}},"refId":"A"}],"range":{"from":"{{ .ActiveAt.UnixMilli }}","to":"now"}}'
     deploy:
       mode: replicated
@@ -40,6 +50,8 @@ configs:
     file: ${CONFIGS}/vmalert/alerts.yml
 
 secrets:
+  ca_crt:
+    file: ${SECRETS}/ca.crt
   vmalert_crt:
     file: ${SECRETS}/vmalert.crt
   vmalert_key:

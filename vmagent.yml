@@ -11,6 +11,8 @@ services:
       - source: vmagent_yml
         target: /etc/vmagent/config.yml
     secrets:
+      - source: ca_crt
+        target: /etc/vmagent/tls/ca.crt
       - source: vmagent_crt
         target: /etc/vmagent/tls/vmagent.crt
       - source: vmagent_key
@@ -22,8 +24,10 @@ services:
       - "--tls"
       - "--tlsCertFile=/etc/vmagent/tls/vmagent.crt"
       - "--tlsKeyFile=/etc/vmagent/tls/vmagent.key"
-      - "--remoteWrite.url=https://victoriametrics.$DOMAIN/api/v1/write"
+
+      - "--remoteWrite.url=https://prod-victoriametrics001.$DOMAIN:$VICTORIAMETRICS_HTTP_PORT/api/v1/write"
       - "--remoteWrite.tmpDataPath=/vmagentdata"
+      - "--remoteWrite.tlsCAFile=/etc/vmagent/tls/ca.crt"
       - "--promscrape.config=/etc/vmagent/config.yml"
     deploy:
       mode: replicated
@@ -38,6 +42,8 @@ configs:
     file: ${CONFIGS}/vmagent/vmagent.yml
 
 secrets:
+  ca_crt:
+    file: ${SECRETS}/ca.crt
   vmagent_crt:
     file: ${SECRETS}/vmagent.crt
   vmagent_key:

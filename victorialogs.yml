@@ -29,7 +29,7 @@ services:
       - "--tls"
       - "--tlsCertFile=/etc/victorialogs/tls/victorialogs.crt"
       - "--tlsKeyFile=/etc/victorialogs/tls/victorialogs.key"
-      - "--retentionPeriod=30d"
+      - "--retentionPeriod=7d"
     deploy:
       mode: replicated
       replicas: $VICTORIALOGS_REPLICAS
