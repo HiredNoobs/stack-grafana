@@ -10,6 +10,10 @@ services:
     configs:
       - source: datasources_yml
         target: /etc/grafana/provisioning/datasources/datasources.yml
+      - source: dashboards_yml
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+      - source: nginx_dashboard
+        target: /etc/grafana/dashboards/nginx-dashboard.json
     secrets:
       - source: grafana_crt
         target: /etc/grafana/tls/grafana.crt
@@ -33,6 +37,10 @@ services:
 configs:
   datasources_yml:
     file: ${CONFIGS}/grafana/datasources.yml
+  dashboards_yml:
+    file: ${CONFIGS}/grafana/dashboards.yml
+  nginx_dashboard:
+    file: ${CONFIGS}/grafana/dashboards/nginx-dashboard.json
 
 secrets:
   grafana_crt:
