@@ -1,4 +1,4 @@
-# See: https://samber.github.io/awesome-prometheus-alerts/rules.html#host-and-hardware
+# See: https://samber.github.io/awesome-prometheus-alerts/rules.html
 groups:
   - name: Node
     interval: 60s
@@ -12,6 +12,7 @@ groups:
         annotations:
           summary: Host out of memory (instance {{ $labels.instance }})
           description: "Node memory is filling up (< 10% left)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
       - alert: HostMemoryUnderMemoryPressure
         expr: (rate(node_vmstat_pgmajfault[5m]) > 1000)
         for: 0m
@@ -20,6 +21,7 @@ groups:
         annotations:
           summary: Host memory under memory pressure (instance {{ $labels.instance }})
           description: "The node is under heavy memory pressure. High rate of loading memory pages from disk.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
       # When a machine runs out of memory, the node exporter can become unresponsive for several minutes. Even if the system takes 15–20 minutes to recover, the alert should still trigger.
       - alert: HostOomKillDetected
         expr: (increase(node_vmstat_oom_kill[30m]) > 0)
@@ -29,6 +31,7 @@ groups:
         annotations:
           summary: Host OOM kill detected (instance {{ $labels.instance }})
           description: "OOM kill detected\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
       - alert: HostHighCpuLoad
         expr: 1 - (avg without (cpu) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > .80
         for: 10m
@@ -37,6 +40,7 @@ groups:
         annotations:
           summary: Host high CPU load (instance {{ $labels.instance }})
           description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
       - alert: HostSystemdServiceCrashed
         expr: (node_systemd_unit_state{state="failed"} == 1)
         for: 0m
@@ -45,6 +49,7 @@ groups:
         annotations:
           summary: Host systemd service crashed (instance {{ $labels.instance }})
           description: "systemd service crashed\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
       - alert: HostDown
         expr: up{job="node"} == 0
         for: 2m
@@ -53,3 +58,43 @@ groups:
         annotations:
           summary: "Host down: {{ $labels.instance }}"
           description: "Node exporter on {{ $labels.instance }} has been unreachable for 2 minutes."
+
+  - name: Vault
+    interval: 60s
+    concurrency: 1
+    rules:
+      - alert: VaultSealed
+        expr: 'vault_core_unsealed == 0'
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Vault sealed (instance {{ $labels.instance }})
+          description: "Vault instance is sealed on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: VaultTooManyPendingTokens
+        expr: 'avg(vault_token_create_count - vault_token_store_count) > 0'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Vault too many pending tokens (instance {{ $labels.instance }})
+          description: "Too many pending tokens {{ $labels.instance }}: {{ $value | printf \"%.2f\"}}%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: VaultTooManyInfinityTokens
+        expr: 'vault_token_count_by_ttl{creation_ttl="+Inf"} > 3'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Vault too many infinity tokens (instance {{ $labels.instance }})
+          description: "Too many infinity tokens {{ $labels.instance }}: {{ $value | printf \"%.2f\"}}%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: VaultClusterHealth
+        expr: 'sum(vault_core_active) / count(vault_core_active) <= 0.5'
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Vault cluster health (instance {{ $labels.instance }})
+          description: "Vault cluster is not healthy {{ $labels.instance }}: {{ $value | printf \"%.2f\"}}%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
