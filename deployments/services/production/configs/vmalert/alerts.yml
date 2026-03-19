@@ -97,9 +97,9 @@ groups:
       # > 0.3 means multiple leaders (or a node failed to join)
       - alert: VaultClusterHealth
         expr: |
-          (sum(vault_core_active) / count(vault_core_active)) < 0.3
+          (sum(vault_core_active) / count(vault_core_active)) <= 0.32
           OR
-          (sum(vault_core_active) / count(vault_core_active)) > 0.3
+          (sum(vault_core_active) / count(vault_core_active)) >= 0.34
         for: 0m
         labels:
           severity: critical
