@@ -90,11 +90,23 @@ groups:
           summary: Vault too many infinity tokens (instance {{ $labels.instance }})
           description: "Too many infinity tokens {{ $labels.instance }}: {{ $value | printf \"%.2f\"}}%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+      # vault_core_active returns 1 on the active node.
+      # With unauthenticated_metrics_access enabled, all nodes expose metrics.
+      # In a healthy 3‑node cluster, the ratio should be ~0.33333.
+      # < 0.3 means no leader (or unexpected new nodes)
+      # > 0.3 means multiple leaders (or a node failed to join)
       - alert: VaultClusterHealth
-        expr: 'sum(vault_core_active) / count(vault_core_active) <= 0.5'
+        expr: |
+          (sum(vault_core_active) / count(vault_core_active)) < 0.3
+          OR
+          (sum(vault_core_active) / count(vault_core_active)) > 0.3
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: Vault cluster health (instance {{ $labels.instance }})
-          description: "Vault cluster is not healthy {{ $labels.instance }}: {{ $value | printf \"%.2f\"}}%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          summary: Vault cluster health issue (instance {{ $labels.instance }})
+          description: |
+            Vault cluster is not healthy on {{ $labels.instance }}.
+            Expected ~0.33 active ratio, got {{ $value | printf "%.2f" }}.
+            VALUE = {{ $value }}
+            LABELS = {{ $labels }}
