@@ -18,7 +18,10 @@ scrape_configs:
         - "prod-contentbot001.${DOMAIN}:9100"
         - "prod-vault001.${DOMAIN}:9100"
         - "prod-vault002.${DOMAIN}:9100"
+        - "prod-vault003.${DOMAIN}:9100"
         - "prod-grafana001.${DOMAIN}:9100"
+        - "prod-victorialogs001.${DOMAIN}:9100"
+        - "prod-victoriametrics001.${DOMAIN}:9100"
         - "prod-landing001.${DOMAIN}:9100"
         - "atlas.${DOMAIN}:9100"
     scheme: http
@@ -35,6 +38,7 @@ scrape_configs:
       - targets:
           - "prod-vault001.${DOMAIN}:8200"
           - "prod-vault002.${DOMAIN}:8200"
+          - "prod-vault003.${DOMAIN}:8200"
     scheme: https
     tls_config:
       insecure_skip_verify: true
