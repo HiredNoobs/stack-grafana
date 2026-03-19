@@ -50,7 +50,7 @@ scrape_configs:
     static_configs:
       - targets:
           - "prod-rabbitmq001.${DOMAIN}:15692"
-    scheme: https
+    scheme: http
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
