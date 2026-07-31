@@ -25,6 +25,8 @@ services:
       - "--tlsKeyFile=/etc/vmalert/tls/vmalert.key"
 
       - "--datasource.url=https://prod-victoriametrics001.$DOMAIN:$VICTORIAMETRICS_HTTP_PORT"
+      - "--datasource.tlsCAFile=/etc/vmalert/tls/ca.crt"
+
       - "--remoteRead.url=https://prod-victoriametrics001.$DOMAIN:$VICTORIAMETRICS_HTTP_PORT"
       - "--remoteRead.tlsCAFile=/etc/vmalert/tls/ca.crt"
 
