@@ -41,6 +41,7 @@ groups:
           summary: Host high CPU load (instance {{ $labels.instance }})
           description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+      # Only the management VMs, their node_exporter has --collector.systemd (iac-homelab). Talos has no systemd.
       - alert: HostSystemdServiceCrashed
         expr: (node_systemd_unit_state{state="failed"} == 1)
         for: 0m
@@ -58,6 +59,44 @@ groups:
         annotations:
           summary: "Host down: {{ $labels.instance }}"
           description: "Node exporter on {{ $labels.instance }} has been unreachable for 2 minutes."
+
+  # kubelet_volume_stats_* from the kubelet job, labelled with the PVC's namespace and name.
+  - name: PersistentVolume
+    interval: 60s
+    concurrency: 1
+    rules:
+      - alert: PersistentVolumeOutOfSpace
+        expr: 'kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < .10'
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Persistent volume out of space ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})
+          description: "Volume {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} is almost full (< 10% left)
+  VALUE = {{ $value }}
+  LABELS = {{ $labels }}"
+
+      - alert: PersistentVolumeMayFillIn24Hours
+        expr: 'predict_linear(kubelet_volume_stats_available_bytes[3h], 86400) <= 0 and kubelet_volume_stats_available_bytes > 0'
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Persistent volume may fill in 24 hours ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})
+          description: "Volume {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} will likely run out of space within the next 24 hours.
+  VALUE = {{ $value }}
+  LABELS = {{ $labels }}"
+
+      - alert: PersistentVolumeOutOfInodes
+        expr: 'kubelet_volume_stats_inodes_free / kubelet_volume_stats_inodes < .10 and kubelet_volume_stats_inodes > 0'
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Persistent volume out of inodes ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})
+          description: "Volume {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} is almost out of inodes (< 10% left)
+  VALUE = {{ $value }}
+  LABELS = {{ $labels }}"
 
   - name: Vault
     interval: 60s

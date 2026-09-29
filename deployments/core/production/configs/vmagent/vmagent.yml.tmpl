@@ -37,6 +37,25 @@ scrape_configs:
       - target_label: job
         replacement: node
 
+  # Each kubelet, for the persistent volume stats (node_exporter doesn't see the pod volume
+  # mounts). Authenticates with vmagent's service account token (rbac.yaml, nodes/metrics).
+  # Talos' kubelet serving certs are self-signed. Only the volume stats are kept.
+  - job_name: kubelet
+    metrics_path: /metrics
+    scheme: https
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tls_config:
+      insecure_skip_verify: true
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: instance
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "kubelet_volume_stats_.+"
+        action: keep
+
   # Every Vault node (stack-vault), metrics are unauthenticated. Sealed nodes are scraped too.
   - job_name: "vault"
     metrics_path: /v1/sys/metrics

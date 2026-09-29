@@ -26,11 +26,6 @@ The `*.tmpl` configs are rendered with a fixed list of variables (`CONFIG_TEMPLA
 
 `clean` keeps the data volumes, `purge` removes them.
 
-## Deployments
-
-- `core/production` - the `production.core` cluster (was `services/production` on swarm).
-- `core/development` - the `development.core` cluster (to be built).
-
 ## Credits
 
 Nginx dashboard is heavily based on: <https://grafana.com/grafana/dashboards/24774-nginx-with-vlogs>

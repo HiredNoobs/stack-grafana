@@ -27,7 +27,7 @@ COMPONENTS="grafana victorialogs victoriametrics vmagent vmalert alertmanager"
 # -----------------------------------------------------
 
 function check_stack_context {
-  local component nodes count
+  local component node_count count
 
   if [[ -z "${GRAFANA_ADMIN_PASS:-}" ]]; then
     log_error "GRAFANA_ADMIN_PASS missing from 'secrets.env'."
@@ -40,8 +40,8 @@ function check_stack_context {
   fi
 
   for component in $COMPONENTS; do
-    nodes="${component^^}_NODES"
-    count=$(count "${!nodes:-}")
+    node_count="${component^^}_NODE_COUNT"
+    count="${!node_count}"
 
     if (( count == 0 )); then
       log_error "No nodes are labelled ${STACK}_$component."
@@ -163,23 +163,32 @@ function stack_check_env {
 }
 
 function stack_discover {
-  :
+  local component nodes
+
+  for component in $COMPONENTS; do
+    nodes="${component^^}_NODES"
+    export "${component^^}_NODE_COUNT=$(count "${!nodes:-}")"
+  done
 }
 
 function stack_env {
-  local component image nodes
+  local component image nodes node_count
 
   echo
   for component in $COMPONENTS; do
     image="${component^^}_IMAGE"
     nodes="${component^^}_NODES"
-    printf '%-16s = %s\n' "${component^^}" "${!image}"
+    node_count="${component^^}_NODE_COUNT"
+    printf '%-21s = %s\n' "${component^^} IMAGE" "${!image}"
+    printf '%-21s = (%s)\n' "${component^^} NODES" "${!node_count}"
     list "${!nodes:-}"
+    echo
   done
-  printf '%-16s = %s\n' "NODE-EXPORTER" "$NODE_EXPORTER_IMAGE (every node)"
+  printf '%-21s = %s\n' "NODE-EXPORTER IMAGE" "$NODE_EXPORTER_IMAGE"
+  printf '%-21s = %s\n' "NODE-EXPORTER NODES" "(every node)"
   echo
-  echo "STORAGE CLASS    = $MONITORING_STORAGE_CLASS"
-  echo "RETENTION        = $MONITORING_RETENTION"
+  printf '%-21s = %s\n' "STORAGE CLASS" "$MONITORING_STORAGE_CLASS"
+  printf '%-21s = %s\n' "RETENTION" "$MONITORING_RETENTION"
   echo
 }
 

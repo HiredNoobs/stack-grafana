@@ -1,5 +1,6 @@
-# vmagent's Kubernetes service discovery, to find the node-exporter and Vault pods. Cluster wide,
-# so it isn't removed with the namespace ('clean' and 'purge' remove it).
+# vmagent's Kubernetes service discovery, to find the node-exporter and Vault pods, and read
+# access to each kubelet's metrics (nodes/metrics) for the volume stats. Cluster wide, so it
+# isn't removed with the namespace ('clean' and 'purge' remove it).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -15,7 +16,7 @@ metadata:
     app.kubernetes.io/name: vmagent
 rules:
   - apiGroups: [""]
-    resources: ["pods", "nodes", "services", "endpoints"]
+    resources: ["pods", "nodes", "nodes/metrics", "services", "endpoints"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
