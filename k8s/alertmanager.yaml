@@ -1,0 +1,94 @@
+# Alertmanager on a node labelled ${STACK}_alertmanager, a single replica (not clustered).
+# Silences and notification state are kept in an emptyDir, so they're lost on restart.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  labels:
+    app.kubernetes.io/name: alertmanager
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager
+      annotations:
+        checksum/config: "${MONITORING_CONFIG_CHECKSUM}"
+    spec:
+      nodeSelector:
+        ${STACK}_alertmanager: ""
+      containers:
+        - name: alertmanager
+          image: ${ALERTMANAGER_IMAGE}
+          args:
+            - "--config.file=/etc/alertmanager/config/alertmanager.yml"
+            - "--web.config.file=/etc/alertmanager/config/alertmanager_web.yml"
+            - "--web.listen-address=:${ALERTMANAGER_HTTP_PORT}"
+            - "--web.external-url=https://alertmanager.${DOMAIN}"
+            - "--storage.path=/alertmanager"
+          ports:
+            - name: https
+              containerPort: ${ALERTMANAGER_HTTP_PORT}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: https
+              scheme: HTTPS
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager/config
+              readOnly: true
+            - name: tls
+              mountPath: /etc/alertmanager/tls
+              readOnly: true
+            - name: data
+              mountPath: /alertmanager
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+        - name: tls
+          secret:
+            secretName: monitoring-tls
+            items:
+              - { key: alertmanager.crt, path: alertmanager.crt }
+              - { key: alertmanager.key, path: alertmanager.key }
+        - name: data
+          emptyDir: {}
+---
+# alertmanager.$DOMAIN through nginx, in the cluster for vmalert and Grafana.
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  labels:
+    app.kubernetes.io/name: alertmanager
+spec:
+  selector:
+    app.kubernetes.io/name: alertmanager
+  ports:
+    - name: https
+      port: ${ALERTMANAGER_HTTP_PORT}
+      targetPort: https
+      protocol: TCP

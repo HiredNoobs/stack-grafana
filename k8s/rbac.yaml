@@ -1,0 +1,34 @@
+# vmagent's Kubernetes service discovery, to find the node-exporter and Vault pods. Cluster wide,
+# so it isn't removed with the namespace ('clean' and 'purge' remove it).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vmagent
+  labels:
+    app.kubernetes.io/name: vmagent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${K8S_NAMESPACE}-vmagent
+  labels:
+    app.kubernetes.io/name: vmagent
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${K8S_NAMESPACE}-vmagent
+  labels:
+    app.kubernetes.io/name: vmagent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ${K8S_NAMESPACE}-vmagent
+subjects:
+  - kind: ServiceAccount
+    name: vmagent
+    namespace: ${K8S_NAMESPACE}

@@ -22,6 +22,21 @@ scrape_configs:
       - source_labels: [__meta_kubernetes_pod_node_name]
         target_label: instance
 
+  # node_exporter installed by iac-homelab's monitoring playbook on the management VMs.
+  - job_name: node-mgmt
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - "prx-001-srv-mgmt-001.${DOMAIN}:9100"
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "([^:]+):.*"
+        target_label: instance
+        replacement: "$1"
+      - target_label: job
+        replacement: node
+
   # Every Vault node (stack-vault), metrics are unauthenticated. Sealed nodes are scraped too.
   - job_name: "vault"
     metrics_path: /v1/sys/metrics

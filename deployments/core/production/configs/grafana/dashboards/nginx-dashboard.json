@@ -646,7 +646,6 @@
         "type": "victoriametrics-logs-datasource",
         "uid": "victorialogs"
       },
-      "description": "最近请求",
       "fieldConfig": {
         "defaults": {},
         "overrides": []

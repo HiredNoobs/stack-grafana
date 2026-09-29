@@ -1,101 +1,154 @@
 #!/usr/bin/env bash
+#
+# Monitoring: Grafana, VictoriaMetrics, VictoriaLogs, vmagent, vmalert and Alertmanager, each a
+# single instance on a node labelled ${STACK}_<component>, plus node_exporter on every node.
+# They talk to each other over TLS (the stack's monitoring CA) by their service names, nginx
+# proxies <component>.$DOMAIN to each.
+
+# Variables substituted in k8s/*.yaml, anything else is left alone.
+K8S_TEMPLATE_VARS='$STACK $DOMAIN $K8S_NAMESPACE $MONITORING_CONFIG_CHECKSUM $MONITORING_STORAGE_CLASS $MONITORING_RETENTION
+  $GRAFANA_IMAGE $GRAFANA_PORT $GRAFANA_VOLUME_SIZE
+  $VICTORIALOGS_IMAGE $VICTORIALOGS_HTTP_PORT $VICTORIALOGS_UDP_PORT $VICTORIALOGS_TCP_PORT $VICTORIALOGS_VOLUME_SIZE
+  $VICTORIAMETRICS_IMAGE $VICTORIAMETRICS_HTTP_PORT $VICTORIAMETRICS_VOLUME_SIZE
+  $VMAGENT_IMAGE $VMAGENT_HTTP_PORT
+  $VMALERT_IMAGE $VMALERT_HTTP_PORT
+  $ALERTMANAGER_IMAGE $ALERTMANAGER_HTTP_PORT
+  $NODE_EXPORTER_IMAGE $NODE_EXPORTER_PORT'
+
+# Variables substituted in configs/**/*.tmpl. A list, so Grafana's $__file{} and relabel $1s are left alone.
+CONFIG_TEMPLATE_VARS='$DOMAIN $K8S_NAMESPACE $GRAFANA_PORT $VICTORIALOGS_HTTP_PORT $VICTORIAMETRICS_HTTP_PORT
+  $VMAGENT_HTTP_PORT $VMALERT_HTTP_PORT $ALERTMANAGER_HTTP_PORT $NODE_EXPORTER_PORT'
+
+# Each has a cert and runs on a node labelled ${STACK}_<component>. node_exporter runs everywhere.
+COMPONENTS="grafana victorialogs victoriametrics vmagent vmalert alertmanager"
 
 # -----------------------------------------------------
 # Helper functions
 # -----------------------------------------------------
 
 function check_stack_context {
+  local component nodes count
+
   if [[ -z "${GRAFANA_ADMIN_PASS:-}" ]]; then
     log_error "GRAFANA_ADMIN_PASS missing from 'secrets.env'."
     exit 1
   fi
+
+  if [[ -z "${DOMAIN:-}" ]]; then
+    log_error "DOMAIN isn't set, it's needed for the external URLs."
+    exit 1
+  fi
+
+  for component in $COMPONENTS; do
+    nodes="${component^^}_NODES"
+    count=$(count "${!nodes:-}")
+
+    if (( count == 0 )); then
+      log_error "No nodes are labelled ${STACK}_$component."
+      exit 1
+    elif (( count > 1 )); then
+      log_warning "$count nodes are labelled ${STACK}_$component, it runs once on one of them."
+    fi
+  done
+
+  k8s_require_longhorn "$MONITORING_STORAGE_CLASS"
 }
 
+function render {
+  envsubst "$K8S_TEMPLATE_VARS" < "$STACK_PATH/k8s/$1"
+}
+
+# Renders configs/**/*.tmpl into $1 (same layout), so rendered files never end up in the repo.
 function build_configs {
-  find "$CONFIGS" -maxdepth 2 -type f -name '*.tmpl' | while IFS= read -r tmpl; do
-    local out="${tmpl%.tmpl}"
-    envsubst < "$tmpl" > "$out"
+  local outdir="$1" tmpl out
+
+  find "$CONFIGS" -type f -name '*.tmpl' | while IFS= read -r tmpl; do
+    out="$outdir/${tmpl#"$CONFIGS"/}"
+    mkdir -p "$(dirname "$out")"
+    envsubst "$CONFIG_TEMPLATE_VARS" < "$tmpl" > "${out%.tmpl}"
   done
 }
 
+# The component's service names, and localhost.
+function cert_names {
+  echo "$1 $1.$K8S_NAMESPACE.svc $1.$K8S_NAMESPACE.svc.cluster.local localhost"
+}
+
+# One CA for the stack, the certs are regenerated when their names change.
 function build_secrets {
+  local component names
+
   if [[ ! -f "$SECRETS/ca.crt" || ! -f "$SECRETS/ca.key" ]]; then
     make-ca monitoring -o "$SECRETS"
     make-truststore monitoring "$SECRETS/ca.crt" -o "$SECRETS"
   fi
 
-  declare -A CERT_TARGETS=(
-    [grafana]="$GRAFANA_NODES $GRAFANA_FQDN_NODES"
-    [victorialogs]="$VICTORIALOGS_NODES $VICTORIALOGS_FQDN_NODES"
-    [victoriametrics]="$VICTORIAMETRICS_NODES $VICTORIAMETRICS_FQDN_NODES"
-    [vmagent]="$VMAGENT_NODES $VMAGENT_FQDN_NODES"
-    [vmalert]="$VMALERT_NODES $VMALERT_FQDN_NODES"
-    [alertmanager]="$ALERTMANAGER_NODES $ALERTMANAGERT_FQDN_NODES"
-  )
+  for component in $COMPONENTS; do
+    names=$(cert_names "$component")
 
-  for service in "${!CERT_TARGETS[@]}"; do
-    local crt="$SECRETS/$service.crt"
-    local key="$SECRETS/$service.key"
-
-    if [[ ! -f "$crt" || ! -f "$key" ]]; then
-      make-cert "$service" "${CERT_TARGETS[$service]}" \
-        -o "$SECRETS" \
-        --ca-crt "$SECRETS/ca.crt" \
-        --ca-key "$SECRETS/ca.key"
+    if [[ ! -f "$SECRETS/$component.crt" || ! -f "$SECRETS/$component.key" \
+          || "$(cat "$SECRETS/$component.names" 2> /dev/null)" != "$names" ]]; then
+      make-cert "$component" "$names" -o "$SECRETS" --ca-crt "$SECRETS/ca.crt" --ca-key "$SECRETS/ca.key"
+      echo "$names" > "$SECRETS/$component.names"
     fi
   done
 }
 
-function grafana_health {
-  local resp http_code start now elapsed
+# Everything that needs a restart when it changes.
+function config {
+  local outdir="$1" component tls_args=(--from-file=ca.crt="$SECRETS/ca.crt")
 
-  log_info "Waiting for Grafana to become healthy..."
-
-  start=$(date +%s)
-  while true; do
-    resp=$(curl -s -w "\n%{http_code}" "https://grafana.$DOMAIN/api/health")
-    http_code="${resp: -3}"
-
-    if [[ "$http_code" == "200" ]]; then
-      log_info "Grafana ready."
-      break
-    fi
-
-    now=$(date +%s)
-    elapsed=$(( now - start ))
-
-    if (( elapsed > 300 )); then
-      log_error "Grafana did not become ready within 5 minutes."
-      exit 1
-    fi
-
-    sleep 5
+  for component in $COMPONENTS; do
+    tls_args+=(--from-file="$component.crt=$SECRETS/$component.crt" --from-file="$component.key=$SECRETS/$component.key")
   done
+
+  kubectl create secret generic monitoring-tls "${tls_args[@]}" --dry-run=client -o yaml
+  echo "---"
+  kubectl create secret generic grafana-admin \
+    --from-literal=password="$GRAFANA_ADMIN_PASS" \
+    --dry-run=client -o yaml
+  echo "---"
+  kubectl create configmap grafana-provisioning \
+    --from-file=datasources.yml="$outdir/grafana/datasources.yml" \
+    --from-file=dashboards.yml="$CONFIGS/grafana/dashboards.yml" \
+    --dry-run=client -o yaml
+  echo "---"
+  kubectl create configmap vmagent-config \
+    --from-file=vmagent.yml="$outdir/vmagent/vmagent.yml" \
+    --dry-run=client -o yaml
+  echo "---"
+  kubectl create configmap vmalert-rules \
+    --from-file="$CONFIGS/vmalert/" \
+    --dry-run=client -o yaml
+  echo "---"
+  kubectl create configmap alertmanager-config \
+    --from-file="$CONFIGS/alertmanager/" \
+    --dry-run=client -o yaml
 }
 
 # -----------------------------------------------------
-# Commands
+# Override functions
 # -----------------------------------------------------
 
-function command_grafana_install_plugins {
-  discover_stack_context
-  run_grafana_install_plugins
+# Keeps the namespace and the volumes (Grafana, VictoriaMetrics and VictoriaLogs data).
+# The cluster wide RBAC isn't in the namespace, so it's removed here.
+function run_clean {
+  log_info "'clean' has been overridden by stack."
+  log_info "Removing monitoring (namespace $K8S_NAMESPACE), keeping the data volumes."
+  kubectl delete statefulset,deployment,daemonset,service,configmap --all \
+    --namespace "$K8S_NAMESPACE" --ignore-not-found --wait=true
+  kubectl delete secret/monitoring-tls secret/grafana-admin serviceaccount/vmagent \
+    --namespace "$K8S_NAMESPACE" --ignore-not-found
+  kubectl delete clusterrolebinding,clusterrole "$K8S_NAMESPACE-vmagent" --ignore-not-found
 }
 
-# -----------------------------------------------------
-# Grafana functions
-# -----------------------------------------------------
-
-function run_grafana_install_plugins {
-  local grafana_node container_id
-  
-  grafana_node=$(first "$GRAFANA_FQDN_NODES")
-  container_id=$(docker -H "ssh://$grafana_node" ps --filter "name=${STACK}_grafana" --filter status=running -q)
-
-  docker -H "ssh://$grafana_node" exec "$container_id" grafana cli plugins install victoriametrics-logs-datasource
-  docker -H "ssh://$grafana_node" exec "$container_id" grafana cli plugins install victoriametrics-metrics-datasource
-
-  log_info "Plugins installed or updated. A re-deploy may be necessary."
+# Deleting the namespace removes the volumes, every metric and log with them.
+function run_purge {
+  log_info "'purge' has been overridden by stack."
+  log_warning "Removing namespace $K8S_NAMESPACE, including the data volumes."
+  orchestrator_clean
+  orchestrator_purge
+  kubectl delete clusterrolebinding,clusterrole "$K8S_NAMESPACE-vmagent" --ignore-not-found
 }
 
 # -----------------------------------------------------
@@ -103,72 +156,64 @@ function run_grafana_install_plugins {
 # -----------------------------------------------------
 
 function stack_check_env {
-  if [ ! -d "$SECRETS" ]; then
-    echo "Secrets directory is missing from '$ENVIRONMENT_BASE'."
+  if [ ! -d "$CONFIGS" ] || [ ! -d "$SECRETS" ]; then
+    echo "Configs or secrets directory are missing from '$ENVIRONMENT_BASE'."
     exit 1
   fi
 }
 
 function stack_discover {
-  export GRAFANA_REPLICAS=$(count "$GRAFANA_NODES")
-  export VICTORIALOGS_REPLICAS=$(count "$VICTORIALOGS_NODES")
-  export VICTORIAMETRICS_REPLICAS=$(count "$VICTORIAMETRICS_NODES")
-  export VMAGENT_REPLICAS=$(count "$VMAGENT_NODES")
-  export VMALERT_REPLICAS=$(count "$VMALERT_NODES")
-  export ALERTMANAGER_REPLICAS=$(count "$ALERTMANAGER_NODES")
+  :
 }
 
 function stack_env {
-  echo
-  echo "GRAFANA IMAGE                = $GRAFANA_IMAGE"
-  echo "GRAFANA NODES                = ($GRAFANA_REPLICAS)"
-  list "$GRAFANA_NODES"
-  echo
+  local component image nodes
 
-  echo "VICTORIALOGS IMAGE           = $VICTORIALOGS_IMAGE"
-  echo "VICTORIALOGS UDP PORT        = $VICTORIALOGS_UDP_PORT"
-  echo "VICTORIALOGS TCP PORT        = $VICTORIALOGS_TCP_PORT"
-  echo "VICTORIALOGS HTTP PORT       = $VICTORIALOGS_HTTP_PORT"
-  echo "VICTORIALOGS NODES           = ($VICTORIALOGS_REPLICAS)"
-  list "$VICTORIALOGS_NODES"
   echo
-
-  echo "VICTORIAMETRICS IMAGE        = $VICTORIAMETRICS_IMAGE"
-  echo "VICTORIAMETRICS HTTP PORT    = $VICTORIAMETRICS_HTTP_PORT"
-  echo "VICTORIAMETRICS NODES        = ($VICTORIAMETRICS_REPLICAS)"
-  list "$VICTORIAMETRICS_NODES"
+  for component in $COMPONENTS; do
+    image="${component^^}_IMAGE"
+    nodes="${component^^}_NODES"
+    printf '%-16s = %s\n' "${component^^}" "${!image}"
+    list "${!nodes:-}"
+  done
+  printf '%-16s = %s\n' "NODE-EXPORTER" "$NODE_EXPORTER_IMAGE (every node)"
   echo
-
-  echo "VMAGENT IMAGE                = $VMAGENT_IMAGE"
-  echo "VMAGENT HTTP PORT            = $VMAGENT_HTTP_PORT"
-  echo "VMAGENT NODES                = ($VMAGENT_REPLICAS)"
-  list "$VMAGENT_NODES"
-  echo
-  echo "VMALERT IMAGE                = $VMALERT_IMAGE"
-  echo "VMALERT HTTP PORT            = $VMALERT_HTTP_PORT"
-  echo "VMALERT NODES                = ($VMALERT_REPLICAS)"
-  list "$VMALERT_NODES"
-  echo
-  echo "ALERTMANAGER IMAGE           = $ALERTMANAGER_IMAGE"
-  echo "ALERTMANAGER HTTP PORT       = $ALERTMANAGER_HTTP_PORT"
-  echo "ALERTMANAGER NODES           = $ALERTMANAGER_REPLICAS"
-  list "$ALERTMANAGER_NODES"
+  echo "STORAGE CLASS    = $MONITORING_STORAGE_CLASS"
+  echo "RETENTION        = $MONITORING_RETENTION"
   echo
 }
 
-
 function stack_deploy {
+  local outdir manifests_config component
+
   check_stack_context
-  build_configs
   build_secrets
-  docker stack deploy --detach=true \
-    -c victorialogs.yml \
-    -c victoriametrics.yml \
-    -c vmagent.yml \
-    -c vmalert.yml \
-    -c alertmanager.yml \
-    -c grafana.yml \
-    "$STACK"
-  grafana_health
-  run_grafana_install_plugins
+
+  outdir=$(mktemp -d)
+  build_configs "$outdir"
+  manifests_config=$(config "$outdir")
+  rm -rf "$outdir"
+
+  export MONITORING_CONFIG_CHECKSUM=$(sha256sum <<< "$manifests_config" | cut -d' ' -f1)
+
+  log_info "Deploying monitoring to $K8S_NAMESPACE."
+  {
+    render rbac.yaml
+    echo "---"
+    echo "$manifests_config"
+    echo "---"
+    # Picked up by Grafana while it's running, so not part of the checksum.
+    kubectl create configmap grafana-dashboards --from-file="$CONFIGS/grafana/dashboards/" --dry-run=client -o yaml
+    for component in $COMPONENTS node-exporter; do
+      echo "---"
+      render "$component.yaml"
+    done
+  } | kubectl apply --namespace "$K8S_NAMESPACE" -f -
+
+  local workload
+  for workload in daemonset/node-exporter statefulset/victoriametrics statefulset/victorialogs \
+                  deployment/alertmanager deployment/vmalert deployment/vmagent statefulset/grafana; do
+    # Grafana installs its plugins on the first start.
+    kubectl rollout status "$workload" --namespace "$K8S_NAMESPACE" --timeout=10m
+  done
 }

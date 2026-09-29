@@ -1,0 +1,116 @@
+# VictoriaLogs on a node labelled ${STACK}_victorialogs, with its data on a
+# ${MONITORING_STORAGE_CLASS} volume. rsyslog (stack-rsyslog) forwards to it, Grafana reads from it.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: victorialogs
+  labels:
+    app.kubernetes.io/name: victorialogs
+spec:
+  serviceName: victorialogs
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victorialogs
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victorialogs
+      annotations:
+        checksum/config: "${MONITORING_CONFIG_CHECKSUM}"
+    spec:
+      nodeSelector:
+        ${STACK}_victorialogs: ""
+      containers:
+        - name: victorialogs
+          image: ${VICTORIALOGS_IMAGE}
+          args:
+            - "--storageDataPath=/var/lib/victoria-logs"
+            - "--httpListenAddr=:${VICTORIALOGS_HTTP_PORT}"
+            - "--syslog.listenAddr.udp=:${VICTORIALOGS_UDP_PORT}"
+            - "--syslog.listenAddr.tcp=:${VICTORIALOGS_TCP_PORT}"
+            - "--tls"
+            - "--tlsCertFile=/etc/victorialogs/tls/victorialogs.crt"
+            - "--tlsKeyFile=/etc/victorialogs/tls/victorialogs.key"
+            - "--retentionPeriod=${MONITORING_RETENTION}"
+          ports:
+            - name: https
+              containerPort: ${VICTORIALOGS_HTTP_PORT}
+              protocol: TCP
+            - name: syslog-udp
+              containerPort: ${VICTORIALOGS_UDP_PORT}
+              protocol: UDP
+            - name: syslog-tcp
+              containerPort: ${VICTORIALOGS_TCP_PORT}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: https
+              scheme: HTTPS
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/victorialogs/tls
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/victoria-logs
+      volumes:
+        - name: tls
+          secret:
+            secretName: monitoring-tls
+            items:
+              - { key: victorialogs.crt, path: victorialogs.crt }
+              - { key: victorialogs.key, path: victorialogs.key }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: victorialogs
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: ${MONITORING_STORAGE_CLASS}
+        resources:
+          requests:
+            storage: ${VICTORIALOGS_VOLUME_SIZE}
+---
+# victorialogs.$DOMAIN through nginx, in the cluster for Grafana and rsyslog (syslog on 514).
+apiVersion: v1
+kind: Service
+metadata:
+  name: victorialogs
+  labels:
+    app.kubernetes.io/name: victorialogs
+spec:
+  selector:
+    app.kubernetes.io/name: victorialogs
+  ports:
+    - name: https
+      port: ${VICTORIALOGS_HTTP_PORT}
+      targetPort: https
+      protocol: TCP
+    - name: syslog-udp
+      port: ${VICTORIALOGS_UDP_PORT}
+      targetPort: syslog-udp
+      protocol: UDP
+    - name: syslog-tcp
+      port: ${VICTORIALOGS_TCP_PORT}
+      targetPort: syslog-tcp
+      protocol: TCP
