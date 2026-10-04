@@ -1,4 +1,4 @@
-# vmagent's Kubernetes service discovery, to find the node-exporter and Vault pods, and read
+# vmagent's Kubernetes service discovery, to find the node-exporter pods, and read
 # access to each kubelet's metrics (nodes/metrics) for the volume stats. Cluster wide, so it
 # isn't removed with the namespace ('clean' and 'purge' remove it).
 apiVersion: v1

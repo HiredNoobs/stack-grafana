@@ -20,7 +20,7 @@ Longhorn (`stack-longhorn`) has to be deployed first, `deploy` stops if it isn't
 
 The components talk to each other over TLS by their service names (`<component>.grafana-core.svc`), with certs from the stack's CA (`secrets/ca.crt`, regenerated when their names change). nginx proxies `<component>.$DOMAIN` to each. Grafana's data sources go straight to the services, verified with the CA.
 
-vmagent (`configs/vmagent`) finds node_exporter and the Vault pods through the Kubernetes API (a ClusterRole, see `k8s/rbac.yaml`) and scrapes the management VMs' node_exporter and RabbitMQ directly.
+vmagent (`configs/vmagent`) finds node_exporter through the Kubernetes API (a ClusterRole, see `k8s/rbac.yaml`) and scrapes the Debian VMs' node_exporter (management and prx-999, by IP), Vault on prx-999 (`vault.$DOMAIN`) and RabbitMQ directly.
 
 The `*.tmpl` configs are rendered with a fixed list of variables (`CONFIG_TEMPLATE_VARS` in `stack`), so Grafana's `$__file{}` is left alone. The dashboards in `configs/grafana/dashboards` are picked up by Grafana while it runs, everything else restarts the pods when it changes. Grafana installs its plugins on start (`GF_PLUGINS_PREINSTALL`).
 

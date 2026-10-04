@@ -22,18 +22,25 @@ scrape_configs:
       - source_labels: [__meta_kubernetes_pod_node_name]
         target_label: instance
 
-  # node_exporter installed by iac-homelab's monitoring playbook on the management VMs.
-  - job_name: node-mgmt
+  # node_exporter installed by iac-homelab's monitoring playbook on the Debian VMs (management
+  # and the prx-999 servers). By IP, the prx-999 VMs aren't in Pi-hole, instance is the VM name.
+  - job_name: node-debian
     metrics_path: /metrics
     scheme: http
     static_configs:
-      - targets:
-          - "prx-001-srv-mgmt-001.${DOMAIN}:9100"
+      - targets: ["192.168.111.254:9100"]
+        labels: { vm: prx-001-srv-mgmt-001 }
+      - targets: ["192.168.111.200:9100"]
+        labels: { vm: prx-999-srv-git-001 }
+      - targets: ["192.168.111.201:9100"]
+        labels: { vm: prx-999-srv-runner-001 }
+      - targets: ["192.168.111.202:9100"]
+        labels: { vm: prx-999-srv-vault-001 }
     relabel_configs:
-      - source_labels: [__address__]
-        regex: "([^:]+):.*"
+      - source_labels: [vm]
         target_label: instance
-        replacement: "$1"
+      - action: labeldrop
+        regex: vm
       - target_label: job
         replacement: node
 
@@ -56,27 +63,21 @@ scrape_configs:
         regex: "kubelet_volume_stats_.+"
         action: keep
 
-  # Every Vault node (stack-vault), metrics are unauthenticated. Sealed nodes are scraped too.
+  # Vault on prx-999 (iac-homelab), metrics are unauthenticated and a sealed Vault is scraped
+  # too. Let's Encrypt certificate, so it's verified.
   - job_name: "vault"
     metrics_path: /v1/sys/metrics
     params:
       format: ["prometheus"]
     scheme: https
-    tls_config:
-      insecure_skip_verify: true
-    kubernetes_sd_configs:
-      - role: pod
-        namespaces:
-          names: ["vault-core"]
-        selectors:
-          - role: pod
-            label: "app.kubernetes.io/name=vault"
+    static_configs:
+      - targets: ["vault.${DOMAIN}:443"]
+        labels: { vm: prx-999-srv-vault-001 }
     relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_container_port_name]
-        regex: https
-        action: keep
-      - source_labels: [__meta_kubernetes_pod_name]
+      - source_labels: [vm]
         target_label: instance
+      - action: labeldrop
+        regex: vm
 
   - job_name: "rabbitmq"
     metrics_path: /metrics
