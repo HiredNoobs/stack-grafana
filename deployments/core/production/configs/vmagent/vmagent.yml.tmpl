@@ -84,7 +84,7 @@ scrape_configs:
     scheme: http
     static_configs:
       - targets:
-          - "rabbitmq-broker.rabbitmq-core.svc:15692"
+          - "rabbitmq-broker.rabbitmq.svc:15692"
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
